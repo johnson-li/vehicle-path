@@ -1,0 +1,173 @@
+extends base
+
+block content
+    style.
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+
+    .pb-2.mt-2.mb-4.border-bottom
+        h2
+            i.fab.fa-google.fa-sm
+            | Vehicle Route Map
+
+    .btn-group.d-flex(role='group')
+        a.btn.btn-primary(target='_blank', id='setBorderBtn').w-100
+            i.far.fa-check-square.fa-sm
+            | Set Border
+        a.btn.btn-primary(target='_blank', id='clearBorderBtn').w-100
+            i.fas.fa-laptop.fa-sm
+            | Clear Border
+        a.btn.btn-primary(target='_blank', id='getPathsBtn').w-100
+            i.fas.fa-laptop.fa-sm
+            | Get File Names
+
+    #map
+
+    script.
+        var map;
+        var routes = !{routes};
+
+        var bounds = {
+            north: 90,
+            south: -90,
+            east: 180,
+            west: -180
+        };
+
+        var rectangle;
+
+        var mapRoutes = [];
+        var mapMarkers = [];
+        var filePaths = [];
+        var infoWindow;
+
+        function showRoutes() {
+            mapRoutes.forEach(function (value) {
+                value.setMap(null)
+            })
+            mapMarkers.forEach(function (value) {
+                value.setMap(null)
+            })
+            mapRoutes = []
+            mapMarkers = []
+            filePaths = []
+
+            routes.forEach(function (route) {
+                var points = route['path'];
+                var matched = points.filter(function (point) {
+                    return Number(point[0]) >= bounds.south && Number(point[0]) <= bounds.north && Number(point[1]) >= bounds.west && Number(point[1]) <= bounds.east
+                })
+                if (matched.length === 0) {
+                    return
+                }
+
+                var file = route['file'];
+                var path = new google.maps.Polyline({
+                    path: points.map(function (point) {
+                        return {lat: point[0], lng: point[1]};
+                    }),
+                    geodesic: true,
+                    strokeColor: '#FF0000',
+                    strokeOpacity: 1.0,
+                    strokeWeight: 2,
+                    title: 123,
+                    map: map
+                });
+                var marker = new google.maps.Marker({
+                    position: {lat: points[0][0], lng: points[0][1]},
+                    map: map,
+                    title: 'Hello World!'
+                });
+                mapRoutes.push(path);
+                mapMarkers.push(marker);
+                filePaths.push(file)
+                google.maps.event.addListener(path, 'click', function (event) {
+                    infoWindow.setContent("File path<br>" + file);
+                    if (event) {
+                        point = event.latLng;
+                    }
+                    infoWindow.setPosition(point);
+                    infoWindow.open(map);
+                });
+                google.maps.event.addListener(marker, 'click', function (event) {
+                    infoWindow.setContent("File path<br>" + file);
+                    if (event) {
+                        point = event.latLng;
+                    }
+                    infoWindow.setPosition(point);
+                    infoWindow.open(map);
+                });
+            })
+        }
+
+        document.getElementById('setBorderBtn').onclick = function (ev) {
+            bounds.north = 60.26598;
+            bounds.south = 60.16598;
+            bounds.east = 25.06796;
+            bounds.west = 24.86796;
+            rectangle.setBounds(bounds)
+            rectangle.setMap(map)
+            showRoutes()
+        }
+
+        document.getElementById('clearBorderBtn').onclick = function (ev) {
+            rectangle.setMap(null)
+            bounds.north = 90;
+            bounds.south = -90;
+            bounds.east = 180;
+            bounds.west = -180;
+            showRoutes()
+        }
+
+        document.getElementById('getPathsBtn').onclick = function (ev) {
+            if (filePaths.length === 0) {
+                alert('No video available in the selected area!')
+            } else {
+                var content = ''
+                filePaths.forEach(function (value) { content = content + value + '\n' })
+                var element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+                element.setAttribute('download', 'video-paths');
+
+                element.style.display = 'none';
+                document.body.appendChild(element);
+                element.click();
+                document.body.removeChild(element);
+            }
+        }
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 60.21598, lng: 24.96796},
+                zoom: 10
+            });
+
+            infoWindow = new google.maps.InfoWindow({size: new google.maps.Size(150, 50)});
+
+            rectangle = new google.maps.Rectangle({
+                bounds: bounds,
+                editable: true
+            });
+            rectangle.addListener('bounds_changed', function (event) {
+                var ne = rectangle.getBounds().getNorthEast();
+                var sw = rectangle.getBounds().getSouthWest();
+                var north = ne.lat()
+                var east = ne.lng()
+                var south = sw.lat()
+                var west = sw.lng()
+                if (north !== bounds.north || south !== bounds.south || east !== bounds.east || west !== bounds.west) {
+                    bounds.north = north
+                    bounds.south = south
+                    bounds.east = east
+                    bounds.west = west
+                    rectangle.setBounds(bounds)
+                    showRoutes()
+                }
+            })
+
+            showRoutes()
+        }
+
+    script(async defer src=`https://maps.googleapis.com/maps/api/js?key=${google_map_api_key}&callback=initMap`)
